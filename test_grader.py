@@ -26,7 +26,7 @@ ap = argparse.ArgumentParser()
 
 ap.add_argument("-i", "--image",
 	help="path to the input image")
-with open("images/jeni/hojajeni112bn.jpg", "rb") as img_file:
+with open("images/bienimpresas/marcadors.png", "rb") as img_file:
     my_string = base64.b64encode(img_file.read())
 image= base64.b64decode(my_string)
 filename = 'output.jpg'  # I assume you have a way of picking unique filenames
@@ -35,6 +35,18 @@ with open(filename, 'wb') as f:
 args = vars(ap.parse_args())
 image = cv2.imread(filename)
 
+height, width, channels = image.shape
+print("shape: ", image.shape)
+percent = (1500 * 100) /height 
+print(percent)
+
+width = int(width * percent / 100)
+height = int(height * percent / 100)
+
+originalImage = image.copy()
+# image = cv2.resize(image, (width,height))
+
+print("shape: ", image.shape)
 
 
 # construct the argument parse and parse the arguments
@@ -49,10 +61,10 @@ ANSWER_KEY = {0: 1, 1: 4, 2: 0, 3: 3, 4: 1}
 answersArray = []
 
 
-# # #DENSE Model
+# #DENSE Model
 # new_model = tf.keras.models.load_model('emnist_trained_dense.h5')
 
-#CNN Model
+# #CNN Model
 new_model = tf.keras.models.load_model('emnist_trained.h5')
 
 
@@ -71,8 +83,14 @@ print (args)
 # cv2.imshow("image", image)
 # cv2.waitKey(0)
 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-edged = cv2.Canny(blurred, 75, 200)
+blurred = cv2.GaussianBlur(gray, (21,21), 0)
+edged = cv2.Canny(blurred, threshold1=5, threshold2=20)
+
+
+imS = cv2.resize(blurred, (750,1000))   
+cv2.imshow("all countours", imS)
+
+cv2.waitKey(0)
 
 
 # find contours in the edge map, then initialize
@@ -82,16 +100,6 @@ cnts = cv2.findContours(edged.copy(), cv2.RETR_EXTERNAL,
 cnts = imutils.grab_contours(cnts)
 docCnt = None
 
-questions = image.copy()
-for ct in cnts:
-	pass
-	cv2.drawContours(questions, [ct], -1, (random.randint(1,254),random.randint(1,254),random.randint(1,254)), -1)
-
-# cv2.drawContours(questions, [cnts[1]], -1, 255, -1)
-imS = cv2.resize(questions, (540,960))   
-cv2.imshow("questions", questions)
-
-cv2.waitKey(0)
 
 
 # ensure that at least one contour was found
@@ -117,6 +125,19 @@ if len(cnts) > 0:
 			paperimage = c
 			break
 
+
+questions = image.copy()
+for ct in cnts:
+	pass
+	cv2.drawContours(questions, [ct], -1, (random.randint(1,254),random.randint(1,254),random.randint(1,254)), -1)
+
+
+imS = cv2.resize(questions, (750,1000))   
+cv2.imshow("all countours", imS)
+
+cv2.waitKey(0)
+
+
 # cv2.drawContours(image, [docCnt], -1, 255, -1)
 # cv2.imshow("paper", image)
 
@@ -126,18 +147,40 @@ if len(cnts) > 0:
 paper = four_point_transform(image, docCnt.reshape(4, 2))
 warped = four_point_transform(gray, docCnt.reshape(4, 2))
 
+
+blurredWarped = cv2.GaussianBlur(warped, (21,21), 0)
+
+
+# cv2.imshow("paper", paper)
+# cv2.imshow("warped", warped)
+
+cv2.waitKey(0)
+
 # apply Otsu's thresholding method to binarize the warped
 # piece of paper
+BlurredThresh = cv2.threshold(blurredWarped, 0, 255,
+	cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
 thresh = cv2.threshold(warped, 0, 255,
 	cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
 
 
 # find contours in the thresholded image, then initialize
 # the list of contours that correspond to questions
-cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
+cnts = cv2.findContours(BlurredThresh.copy(), cv2.RETR_EXTERNAL,
 	cv2.CHAIN_APPROX_SIMPLE)
 cnts = imutils.grab_contours(cnts)
 questionCnts = []
+
+questions = paper.copy()
+for ct in cnts:
+	pass
+	cv2.drawContours(questions, [ct], -1, (random.randint(1,254),random.randint(1,254),random.randint(1,254)), -1)
+
+
+imS = cv2.resize(questions, (750,1000))   
+cv2.imshow("all countours", imS)
+
+cv2.waitKey(0)
 
 # loop over the contours
 for c in cnts:
@@ -160,7 +203,7 @@ for c in cnts:
 		questionCnts.append(c)
 		
 	# bubble
-	if w >= 15 and h >= 15 and ar >= 0.8 and ar <= 1.5:
+	if w >= 50 and h >= 50 and ar >= 0.8 and ar <= 1.5:
 		questionCnts.append(c)
 
 
@@ -176,7 +219,7 @@ for ct in questionCnts:
 	cv2.drawContours(questions, [ct], -1, (random.randint(1,254),random.randint(1,254),random.randint(1,254)), -1)
 
 # cv2.drawContours(questions, [cnts[1]], -1, 255, -1)
-imS = cv2.resize(questions, (540,960))   
+imS = cv2.resize(questions, (750,1000))   
 cv2.imshow("questions", imS)
 
 cv2.waitKey(0)
@@ -225,47 +268,97 @@ while i < len(ARRAYS_LENGHT):
 		#development question
 		# answersArray.append(False)
 
-		x,y,w,h = cv2.boundingRect(cnts[0])
-
-		# box = thresh[y+4 : y+27 , x + 3: x + 27] #tamano de la caja
-		box = thresh[y : y+h , x : x + w] #tamano de la caja
 		
-
-		print("x: " + str(x))
-		print("x: " + str(10 * (x + 27)))
-
-		firstY = y
-		firstX = x
-		stopX = (x + w) - 27
-		stopY = y + h - 27
-
-		ib = 0
-		jb = 0
-
-
-		# print(cnts[0])
-		print(x,y,stopX,stopY)
 		preprocessed_digits = []
 		textAnswer = ""
-		while y <  stopY:
+		textLine = ""
 
-			x = firstX
-			while x < stopX:
+		x,y,w,h = cv2.boundingRect(cnts[0])
 
-				littleBox = thresh[y+4 : y+27 , x + 3: x + 26]
+		# cuadrito = thresh[y+4 : y+27 , x + 4: x + 27] #tamano del cuadrito
 
+		box = thresh[y : y+h , x : x + w] #tamano de la caja de la respuesta de desarrollo
+
+		
+
+		cv2.imshow("rectangle", box)
+
+		cv2.waitKey(0)
+
+		wBox = math.ceil(w/19) - 1
+		
+		hBox = math.ceil(h/4) - 1
+
+		cuadritoNuevo = thresh[y+4 : y+hBox , x + 4: x + wBox]
+
+		#####################################################CODIGO MEDIUM#########################################################
+
+		# Defining a kernel length
+		kernel_length = np.array(box).shape[1]//80
+		
+		# A verticle kernel of (1 X kernel_length), which will detect all the verticle lines from the image.
+		verticle_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, kernel_length))
+		# A horizontal kernel of (kernel_length X 1), which will help to detect all the horizontal line from the image.
+		hori_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_length, 1))
+		# A kernel of (3 X 3) ones.
+		kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+
+
+		# Morphological operation to detect vertical lines from an image
+		img_temp1 = cv2.erode(box, verticle_kernel, iterations=3)
+		verticle_lines_img = cv2.dilate(img_temp1, verticle_kernel, iterations=3)
+		cv2.imwrite("verticle_lines.jpg",verticle_lines_img)
+		# Morphological operation to detect horizontal lines from an image
+		img_temp2 = cv2.erode(box, hori_kernel, iterations=3)
+		horizontal_lines_img = cv2.dilate(img_temp2, hori_kernel, iterations=3)
+		cv2.imwrite("horizontal_lines.jpg",horizontal_lines_img)
+
+		
+		# cv2.imshow("horizontal_lines_img", horizontal_lines_img)
+		# cv2.imshow("verticle_lines_img", verticle_lines_img)
+		# cv2.waitKey(0)
+
+		# Weighting parameters, this will decide the quantity of an image to be added to make a new image.
+		alpha = 0.5
+		beta = 1.0 - alpha
+		# This function helps to add two image with specific weight parameter to get a third image as summation of two image.
+		img_final_bin = cv2.addWeighted(verticle_lines_img, alpha, horizontal_lines_img, beta, 0.0)
+		img_final_bin = cv2.erode(~img_final_bin, kernel, iterations=2)
+		(threshFinal, img_final_bin) = cv2.threshold(img_final_bin, 128,255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+		cv2.imwrite("img_final_bin.jpg",img_final_bin)
+
+		
+		# cv2.imshow("img_final_bin", img_final_bin)
+		# cv2.waitKey(0)
+
+		# # Find contours for image, which will detect all the boxes
+		ctnsBox, hierarchy = cv2.findContours(img_final_bin, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+		# Sort all the contours by top to bottom.
+		(ctnsBox, boundingBoxes) = contours.sort_contours(ctnsBox, method="top-to-bottom")
+		
+
+
+
+		# for ct in ctnsBox:
+		# 	pass
+		# 	cv2.drawContours(box, [ct], -1, (random.randint(1,254),random.randint(1,254),random.randint(1,254)), -1)
+
+			
+		# cv2.imshow("final boxs", box)
+		# cv2.waitKey(0)
+
+		idx = 0
+		for c in ctnsBox:
+			# Returns the location and width,height for every contour
+			xBoxito, yBoxito, wBoxito, hBoxito = cv2.boundingRect(c)
+			# print(xBoxito, yBoxito, wBoxito, hBoxito)
+			if (wBoxito > 17 and hBoxito > 17):
 				
+				idx += 1
+				new_img = box[yBoxito:yBoxito+wBoxito, xBoxito:xBoxito+wBoxito]
 
-				# print(jb, x, firstX, stopX)
-				# cv2.imshow("littleBox", littleBox)
-				# cv2.waitKey(0)
-
-
-				# box = cv2.rectangle(box, (y+4 , x + 3 ), ( y + 27 , x + 27), ( 255, 100, 255)) 
-
-				
 				# Resizing that digit to (18, 18)
-				resized_digit = cv2.resize(littleBox, (18,18))
+				resized_digit = cv2.resize(new_img, (18,18))
 				
 				# Padding the digit with 5 pixels of black color (zeros) in each side to finally produce the image of (28, 28)
 				padded_digit = np.pad(resized_digit, ((5,5),(5,5)), "constant", constant_values=0)
@@ -274,30 +367,115 @@ while i < len(ARRAYS_LENGHT):
 				preprocessed_digits.append(padded_digit)
 
 				# # En caso de usar el model de DENSE
-				# prediction = new_model.predict(digit.flatten().reshape(-1, 28*28))  
+				# prediction = new_model.predict(padded_digit.flatten().reshape(-1, 28*28))  
 
-				# En caso de usar el model de CONVOLUTIONAL
+				# # En caso de usar el model de CONVOLUTIONAL
 				prediction = new_model.predict(padded_digit.reshape(1, 28, 28, 1))
 
-				textAnswer = textAnswer + str(letters[int(np.argmax(prediction))])
+				textLine = textLine + str(letters[int(np.argmax(prediction))])
+				print(str(letters[int(np.argmax(prediction))]))
+				
+				# cv2.imshow("final boxs", padded_digit)
+				# cv2.waitKey(0)
 
+				mask = np.zeros(box.shape, dtype="uint8")
+				cv2.drawContours(mask, c, -1, 255, -1)
+				
+				# apply the mask to the thresholded image, then
+				# count the number of non-zero pixels in the
+				# bubble area
+				mask = cv2.bitwise_and(box, box, mask=mask)
+				total = cv2.countNonZero(mask)
+				print(total)
 
+				if( idx == 19):
+					idx = 0
+					# print(textLine[::-1])
+					textAnswer = textAnswer + textLine[::-1]
+					textLine = ""
+				
+				# cv2.imwrite(cropped_dir_path+str(idx) + '.png', new_img)
+				
 
-				jb = jb + 1
-				x = x + 28
-
-			print(ib, y, firstY, stopY)
-			jb = 0
-			ib = ib + 1
-			y = y + 28
+		for digit in preprocessed_digits:
 		
+			plt.imshow(digit.reshape(28, 28), cmap="gray")
+			plt.show()
+
+		#####################################################CODIGO MEDIUM#########################################################
+		
+		# print("normal  w: ", str(w/19) , " normal  h: ",str(h/4))
+		# print("rounded w: ", boxitoX, " normal  h: ", boxitoY)
+		
+		
+		# cv2.imshow("cuadrito", cuadritoNuevo)
+
+		# cv2.waitKey(0)
+
+		# print("x: " + str(x))
+		# print("x: " + str(10 * (x + 27)))
+
+		# firstY = y
+		# firstX = x
+		# stopX = (x + w) - wBox
+		# stopY = y + h  - hBox
+
+		# ib = 0
+		# jb = 0
+
+
+		# # print(cnts[0])
+		# print(x,y,stopX,stopY)
+		# while y <  stopY:
+
+		# 	x = firstX
+		# 	while x < stopX:
+
+		# 		# littleBox = thresh[y+4 : y+27 , x + 4: x + 27]
+
+
+		# 		# print(jb, x, firstX, stopX)
+		# 		# cv2.imshow("littleBox", littleBox)
+		# 		# cv2.waitKey(0)
+
+
+				
+		# 		# # Resizing that digit to (18, 18)
+		# 		# resized_digit = cv2.resize(littleBox, (18,18))
+				
+		# 		# # Padding the digit with 5 pixels of black color (zeros) in each side to finally produce the image of (28, 28)
+		# 		# padded_digit = np.pad(resized_digit, ((5,5),(5,5)), "constant", constant_values=0)
+				
+		# 		# # Adding the preprocessed digit to the list of preprocessed digits
+		# 		# preprocessed_digits.append(padded_digit)
+
+		# 		# # # En caso de usar el model de DENSE
+		# 		# # prediction = new_model.predict(digit.flatten().reshape(-1, 28*28))  
+
+		# 		# # En caso de usar el model de CONVOLUTIONAL
+		# 		# prediction = new_model.predict(padded_digit.reshape(1, 28, 28, 1))
+
+		# 		# textAnswer = textAnswer + str(letters[int(np.argmax(prediction))])
+
+
+
+		# 		jb = jb + 1
+		# 		x = x + wBox + 1
+
+		# 	print(ib, y, firstY, stopY)
+		# 	jb = 0
+		# 	ib = ib + 1
+		# 	y = y + hBox
+		
+		# index = 0
+		# # for digit in preprocessed_digits:
+		# # 	cv2.imshow("rectangle"+str(index), digit)
+
+		# # 	cv2.waitKey(0)
+
 		print(textAnswer)
 		answersArray.append(textAnswer)
 		
-
-		cv2.imshow("rectangle", box)
-
-		cv2.waitKey(0)
 
 	
 	i = i + 1

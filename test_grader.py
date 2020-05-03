@@ -26,7 +26,7 @@ ap = argparse.ArgumentParser()
 
 ap.add_argument("-i", "--image",
 	help="path to the input image")
-with open("images/bienimpresas/marcadors.png", "rb") as img_file:
+with open("images/bienimpresas/formularioconchecksinmarco.png", "rb") as img_file:
     my_string = base64.b64encode(img_file.read())
 image= base64.b64decode(my_string)
 filename = 'output.jpg'  # I assume you have a way of picking unique filenames
@@ -132,11 +132,6 @@ for ct in cnts:
 	cv2.drawContours(questions, [ct], -1, (random.randint(1,254),random.randint(1,254),random.randint(1,254)), -1)
 
 
-imS = cv2.resize(questions, (750,1000))   
-cv2.imshow("all countours", imS)
-
-cv2.waitKey(0)
-
 
 # cv2.drawContours(image, [docCnt], -1, 255, -1)
 # cv2.imshow("paper", image)
@@ -146,6 +141,17 @@ cv2.waitKey(0)
 # birds eye view of the paper
 paper = four_point_transform(image, docCnt.reshape(4, 2))
 warped = four_point_transform(gray, docCnt.reshape(4, 2))
+
+
+paper = image
+warped = gray
+
+
+# imS = cv2.resize(questions, (750,1000))   
+# cv2.imshow("paper", paper)
+# cv2.imshow("warped", warped)
+
+# cv2.waitKey(0)
 
 
 blurredWarped = cv2.GaussianBlur(warped, (21,21), 0)
@@ -335,19 +341,36 @@ while i < len(ARRAYS_LENGHT):
 
 		# # Find contours for image, which will detect all the boxes
 		ctnsBox, hierarchy = cv2.findContours(img_final_bin, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+		
+		# FILTER CONTOURS WITH WIDT > 50 AND HEIGTH > 50
+		ctnsBoxTemp = []
+		for ct in ctnsBox:
+			pass
+			xBoxito, yBoxito, wBoxito, hBoxito = cv2.boundingRect(ct)
+			
+			if(wBoxito > 50 and hBoxito > 50):
+				ctnsBoxTemp.append(ct)
+
+			# cv2.drawContours(box, [ct], -1, (random.randint(1,254),random.randint(1,254),random.randint(1,254)), -1)
+		ctnsBox = ctnsBoxTemp
+
 		# Sort all the contours by top to bottom.
 		(ctnsBox, boundingBoxes) = contours.sort_contours(ctnsBox, method="top-to-bottom")
 		
-
-
-
+		
 		# for ct in ctnsBox:
 		# 	pass
-		# 	cv2.drawContours(box, [ct], -1, (random.randint(1,254),random.randint(1,254),random.randint(1,254)), -1)
+		# 	xBoxito, yBoxito, wBoxito, hBoxito = cv2.boundingRect(ct)
+			# print(xBoxito, yBoxito, wBoxito, hBoxito)
+			# if(wBoxito > 50 and hBoxito > 50):
+			# 	ctnsBoxTemp.append(ct)
+
+			# cv2.drawContours(box, [ct], -1, (random.randint(1,254),random.randint(1,254),random.randint(1,254)), -1)
 
 			
-		# cv2.imshow("final boxs", box)
-		# cv2.waitKey(0)
+		cv2.imshow("final boxs", box)
+		cv2.waitKey(0)
 
 		idx = 0
 
@@ -388,6 +411,8 @@ while i < len(ARRAYS_LENGHT):
 					new_img = boxPaper[yBoxito:yBoxito+wBoxito, xBoxito:xBoxito+wBoxito]
 					new_img2 = box[yBoxito:yBoxito+wBoxito, xBoxito:xBoxito+wBoxito]
 					
+					
+					
 
 					####################INVENTO DE CORTAR LA LETRA######################
 											
@@ -416,8 +441,6 @@ while i < len(ARRAYS_LENGHT):
 						digit = threshLetter[yi:yi+hi, xi:xi+wi]
 
 						
-						# plt.imshow(im2, cmap="gray")
-						# plt.show()
 							
 						# # Resizing that digit to (18, 18)
 						resized_digit = cv2.resize(digit, (18,18))
@@ -427,6 +450,12 @@ while i < len(ARRAYS_LENGHT):
 
 						
 						prediction = new_model.predict(padded_digit.reshape(1, 28, 28, 1))
+
+						
+						# cv2.imshow("padded_digit", padded_digit)
+						# cv2.imshow("digit", digit)
+						# cv2.imshow("im2", im2)
+						# cv2.waitKey(0)
 
 						
 						textAnswer1 = textAnswer1 + str(letters[int(np.argmax(prediction))])
@@ -515,6 +544,7 @@ while i < len(ARRAYS_LENGHT):
 
 					else: 
 						textAnswer2 = textAnswer2 + " "
+
 			idx = idx + 1
 
 

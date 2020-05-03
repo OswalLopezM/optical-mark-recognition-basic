@@ -277,13 +277,15 @@ while i < len(ARRAYS_LENGHT):
 
 		# cuadrito = thresh[y+4 : y+27 , x + 4: x + 27] #tamano del cuadrito
 
-		box = thresh[y : y+h , x : x + w] #tamano de la caja de la respuesta de desarrollo
+		box = thresh[y+3 : y+h -3 , x+3 : x + w - 3] #tamano de la caja de la respuesta de desarrollo
+		boxPaper = paper[y+3 : y+h -3 , x+3 : x + w - 3] #tamano de la caja de la respuesta de desarrollo
 
 		
 
 		cv2.imshow("rectangle", box)
+		cv2.imshow("rectangle paper", boxPaper)
 
-		cv2.waitKey(0)
+		# cv2.waitKey(0)
 
 		wBox = math.ceil(w/19) - 1
 		
@@ -291,7 +293,7 @@ while i < len(ARRAYS_LENGHT):
 
 		cuadritoNuevo = thresh[y+4 : y+hBox , x + 4: x + wBox]
 
-		#####################################################CODIGO MEDIUM#########################################################
+		#####################################################CODIGO MEDIUM PARA DETECTAR CUADRADOS#########################################################
 
 		# Defining a kernel length
 		kernel_length = np.array(box).shape[1]//80
@@ -311,7 +313,7 @@ while i < len(ARRAYS_LENGHT):
 		# Morphological operation to detect horizontal lines from an image
 		img_temp2 = cv2.erode(box, hori_kernel, iterations=3)
 		horizontal_lines_img = cv2.dilate(img_temp2, hori_kernel, iterations=3)
-		cv2.imwrite("horizontal_lines.jpg",horizontal_lines_img)
+		# cv2.imwrite("horizontal_lines.jpg",horizontal_lines_img)
 
 		
 		# cv2.imshow("horizontal_lines_img", horizontal_lines_img)
@@ -325,7 +327,7 @@ while i < len(ARRAYS_LENGHT):
 		img_final_bin = cv2.addWeighted(verticle_lines_img, alpha, horizontal_lines_img, beta, 0.0)
 		img_final_bin = cv2.erode(~img_final_bin, kernel, iterations=2)
 		(threshFinal, img_final_bin) = cv2.threshold(img_final_bin, 128,255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-		cv2.imwrite("img_final_bin.jpg",img_final_bin)
+		# cv2.imwrite("img_final_bin.jpg",img_final_bin)
 
 		
 		# cv2.imshow("img_final_bin", img_final_bin)
@@ -348,133 +350,188 @@ while i < len(ARRAYS_LENGHT):
 		# cv2.waitKey(0)
 
 		idx = 0
-		for c in ctnsBox:
-			# Returns the location and width,height for every contour
-			xBoxito, yBoxito, wBoxito, hBoxito = cv2.boundingRect(c)
-			# print(xBoxito, yBoxito, wBoxito, hBoxito)
-			if (wBoxito > 17 and hBoxito > 17):
-				
-				idx += 1
-				new_img = box[yBoxito:yBoxito+wBoxito, xBoxito:xBoxito+wBoxito]
 
-				# Resizing that digit to (18, 18)
-				resized_digit = cv2.resize(new_img, (18,18))
-				
-				# Padding the digit with 5 pixels of black color (zeros) in each side to finally produce the image of (28, 28)
-				padded_digit = np.pad(resized_digit, ((5,5),(5,5)), "constant", constant_values=0)
-				
-				# Adding the preprocessed digit to the list of preprocessed digits
-				preprocessed_digits.append(padded_digit)
+		print(len(ctnsBox))
+		startBox = 0
+		stopBox = startBox + 19
 
-				# # En caso de usar el model de DENSE
-				# prediction = new_model.predict(padded_digit.flatten().reshape(-1, 28*28))  
+		textAnswer1 = ""
+		textAnswer2 = ""
 
-				# # En caso de usar el model de CONVOLUTIONAL
-				prediction = new_model.predict(padded_digit.reshape(1, 28, 28, 1))
 
-				textLine = textLine + str(letters[int(np.argmax(prediction))])
-				print(str(letters[int(np.argmax(prediction))]))
+
+
+		while idx < 4:
+		
+			print("idx, startBox , stopBox" )
+			print(idx, startBox , stopBox )
+			partCtnsBox = contours.sort_contours(ctnsBox[startBox : stopBox ])[0]
+
+			startBox = stopBox
+			stopBox = startBox+19
+			print(idx)
+			print(len(partCtnsBox))
+			for c in partCtnsBox:
+
+				# xBoxito, yBoxito, wBoxito, hBoxito = cv2.boundingRect(c)
+				# new_img = boxPaper[yBoxito:yBoxito+wBoxito, xBoxito:xBoxito+wBoxito]
 				
-				# cv2.imshow("final boxs", padded_digit)
+				# cv2.imshow("final boxs", new_img)
 				# cv2.waitKey(0)
 
-				mask = np.zeros(box.shape, dtype="uint8")
-				cv2.drawContours(mask, c, -1, 255, -1)
+
+				xBoxito, yBoxito, wBoxito, hBoxito = cv2.boundingRect(c)
+				# print(xBoxito, yBoxito, wBoxito, hBoxito)
+				if (wBoxito > 17 and hBoxito > 17):
+					
+					# idx += 1
+					new_img = boxPaper[yBoxito:yBoxito+wBoxito, xBoxito:xBoxito+wBoxito]
+					new_img2 = box[yBoxito:yBoxito+wBoxito, xBoxito:xBoxito+wBoxito]
+					
+
+					####################INVENTO DE CORTAR LA LETRA######################
+											
+					grey = cv2.cvtColor(new_img.copy(), cv2.COLOR_BGR2GRAY)	
+					ret, threshLetter = cv2.threshold(grey.copy(), 75, 255, cv2.THRESH_BINARY_INV)
+					ctnsLetter, _ = cv2.findContours(threshLetter.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+					print("STR(LEN(ctnsLetter))" , len(ctnsLetter))
+
+					if(len(ctnsLetter) == 0):
+						# no letter / space
+						print("space")
+						
+						textAnswer1 = textAnswer1 + " "
+
+
+					elif(len(ctnsLetter) > 1):
+						# letter i or j
+						print("i or j")
+
+						rect_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 7))
+						dilation = cv2.dilate(threshLetter, rect_kernel, iterations = 1)
+						
+						im2 = new_img.copy()
+						contoursSpecial, _ = cv2.findContours(dilation, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+						xi, yi, wi, hi = cv2.boundingRect(contoursSpecial[0])
+						digit = threshLetter[yi:yi+hi, xi:xi+wi]
+
+						
+						# plt.imshow(im2, cmap="gray")
+						# plt.show()
+							
+						# # Resizing that digit to (18, 18)
+						resized_digit = cv2.resize(digit, (18,18))
+						
+						# # Padding the digit with 5 pixels of black color (zeros) in each side to finally produce the image of (28, 28)
+						padded_digit = np.pad(resized_digit, ((5,5),(5,5)), "constant", constant_values=0)
+
+						
+						prediction = new_model.predict(padded_digit.reshape(1, 28, 28, 1))
+
+						
+						textAnswer1 = textAnswer1 + str(letters[int(np.argmax(prediction))])
+
+						textLine = textLine + str(letters[int(np.argmax(prediction))])
+						#PRUEBA HACIENDO LA PREDICITION CON ESTA IMAGEN
+						print(str(letters[int(np.argmax(prediction))]), np.argmax(prediction))
+
+					else:	
+						#Normal letter
+						print("normal")
+
+						# (ctnsLetter, boundingBoxes) = contours.sort_contours(ctnsLetter, method="top-to-bottom")
+						print("STR(LEN(ctnsLetter))" , len(ctnsLetter))
+						cLetter = ctnsLetter[0]
+						xL,yL,wL,hL = cv2.boundingRect(cLetter)
+							
+						# Cropping out the digit from the image corresponding to the current contours in the for loop
+						digit = threshLetter[yL:yL+hL, xL:xL+wL]
+						
+						# # Resizing that digit to (18, 18)
+						resized_digit = cv2.resize(digit, (18,18))
+						
+						# # Padding the digit with 5 pixels of black color (zeros) in each side to finally produce the image of (28, 28)
+						padded_digit = np.pad(resized_digit, ((5,5),(5,5)), "constant", constant_values=0)
+
+						
+						prediction = new_model.predict(padded_digit.reshape(1, 28, 28, 1))
+
+
+						textAnswer1 = textAnswer1 + str(letters[int(np.argmax(prediction))])
+
+
+						print(str(letters[int(np.argmax(prediction))]), np.argmax(prediction))
+							
+							# Adding the preproces
+
+
+
+					
+					####################INVENTO DE CORTAR LA LETRA######################
+					
+					if(len(ctnsLetter) > 0):
+						# Resizing that digit to (18, 18)
+						resized_digit2 = cv2.resize(new_img2, (28,28))
+						
+						
+						
+						# Padding the digit with 5 pixels of black color (zeros) in each side to finally produce the image of (28, 28)
+						padded_digit = np.pad(resized_digit2, ((5,5),(5,5)), "constant", constant_values=0)
+						
+						# Adding the preprocessed digit to the list of preprocessed digits
+						preprocessed_digits.append(resized_digit2)
+
+						# # En caso de usar el model de DENSE
+						# prediction = new_model.predict(padded_digit.flatten().reshape(-1, 28*28))  
+
+						# # En caso de usar el model de CONVOLUTIONAL
+						prediction2 = new_model.predict(resized_digit2.reshape(1, 28, 28, 1))
+
+						textLine = textLine + str(letters[int(np.argmax(prediction))])
+
+						
+						textAnswer2 = textAnswer2 + str(letters[int(np.argmax(prediction2))])
+						print(str(letters[int(np.argmax(prediction2))]), np.argmax(prediction2))
+
+						
+						# plt.imshow(padded_digit, cmap="gray")
+						# plt.show()
+						
+						# plt.imshow(resized_digit.reshape(28, 28), cmap="gray")
+						# plt.show()
+						
+						
+							
+						
+						print("\n\n\n----------------Contoured Image--------------------")
+
+						# if( idx == 19):
+						# 	idx = 0
+						# 	# print(textLine[::-1])
+						# 	textAnswer = textAnswer + textLine[::-1]
+						# 	textLine = ""
+						
+						# cv2.imwrite(cropped_dir_path+str(idx) + '.png', new_img)
+
+					else: 
+						textAnswer2 = textAnswer2 + " "
+			idx = idx + 1
+
+
+
+
+
+		# for c in ctnsBox:
+			# Returns the location and width,height for every contour
+			
+
+		###############################CODIGO MEDIUM PARA DETECTAR CUADRADOS#########################################################
 				
-				# apply the mask to the thresholded image, then
-				# count the number of non-zero pixels in the
-				# bubble area
-				mask = cv2.bitwise_and(box, box, mask=mask)
-				total = cv2.countNonZero(mask)
-				print(total)
 
-				if( idx == 19):
-					idx = 0
-					# print(textLine[::-1])
-					textAnswer = textAnswer + textLine[::-1]
-					textLine = ""
-				
-				# cv2.imwrite(cropped_dir_path+str(idx) + '.png', new_img)
-				
-
-		for digit in preprocessed_digits:
-		
-			plt.imshow(digit.reshape(28, 28), cmap="gray")
-			plt.show()
-
-		#####################################################CODIGO MEDIUM#########################################################
-		
-		# print("normal  w: ", str(w/19) , " normal  h: ",str(h/4))
-		# print("rounded w: ", boxitoX, " normal  h: ", boxitoY)
-		
-		
-		# cv2.imshow("cuadrito", cuadritoNuevo)
-
-		# cv2.waitKey(0)
-
-		# print("x: " + str(x))
-		# print("x: " + str(10 * (x + 27)))
-
-		# firstY = y
-		# firstX = x
-		# stopX = (x + w) - wBox
-		# stopY = y + h  - hBox
-
-		# ib = 0
-		# jb = 0
-
-
-		# # print(cnts[0])
-		# print(x,y,stopX,stopY)
-		# while y <  stopY:
-
-		# 	x = firstX
-		# 	while x < stopX:
-
-		# 		# littleBox = thresh[y+4 : y+27 , x + 4: x + 27]
-
-
-		# 		# print(jb, x, firstX, stopX)
-		# 		# cv2.imshow("littleBox", littleBox)
-		# 		# cv2.waitKey(0)
-
-
-				
-		# 		# # Resizing that digit to (18, 18)
-		# 		# resized_digit = cv2.resize(littleBox, (18,18))
-				
-		# 		# # Padding the digit with 5 pixels of black color (zeros) in each side to finally produce the image of (28, 28)
-		# 		# padded_digit = np.pad(resized_digit, ((5,5),(5,5)), "constant", constant_values=0)
-				
-		# 		# # Adding the preprocessed digit to the list of preprocessed digits
-		# 		# preprocessed_digits.append(padded_digit)
-
-		# 		# # # En caso de usar el model de DENSE
-		# 		# # prediction = new_model.predict(digit.flatten().reshape(-1, 28*28))  
-
-		# 		# # En caso de usar el model de CONVOLUTIONAL
-		# 		# prediction = new_model.predict(padded_digit.reshape(1, 28, 28, 1))
-
-		# 		# textAnswer = textAnswer + str(letters[int(np.argmax(prediction))])
-
-
-
-		# 		jb = jb + 1
-		# 		x = x + wBox + 1
-
-		# 	print(ib, y, firstY, stopY)
-		# 	jb = 0
-		# 	ib = ib + 1
-		# 	y = y + hBox
-		
-		# index = 0
-		# # for digit in preprocessed_digits:
-		# # 	cv2.imshow("rectangle"+str(index), digit)
-
-		# # 	cv2.waitKey(0)
-
-		print(textAnswer)
-		answersArray.append(textAnswer)
+		print("textAnswer: " + textAnswer)
+		print("textAnswer1: " + textAnswer1)
+		print("textAnswer2: " + textAnswer2)
+		answersArray.append(textAnswer1)
 		
 
 	
